@@ -1,4 +1,4 @@
-# Nest Payment Workflow Sample
+# NestJS Transaction Workflow
 
 A compact NestJS code sample designed for technical review. It demonstrates how I structure a reliability-sensitive transaction workflow without using proprietary employer code.
 
