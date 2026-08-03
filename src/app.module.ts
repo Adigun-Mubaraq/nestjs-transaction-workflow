@@ -18,7 +18,10 @@ import { WebhooksModule } from './webhooks/webhooks.module';
         database: config.get<string>('DATABASE_NAME', 'payments'),
         autoLoadEntities: true,
         synchronize: true,
-        ssl: config.get<string>('DATABASE_SSL', 'false') === 'true' ? { rejectUnauthorized: false } : false,
+        ssl:
+          config.get<string>('DATABASE_SSL', 'false') === 'true'
+            ? { rejectUnauthorized: false }
+            : false,
       }),
     }),
     TransactionsModule,

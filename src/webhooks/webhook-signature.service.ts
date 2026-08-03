@@ -14,7 +14,10 @@ export class WebhookSignatureService {
     const receivedBuffer = Buffer.from(signature);
     const expectedBuffer = Buffer.from(expected);
 
-    if (receivedBuffer.length !== expectedBuffer.length || !timingSafeEqual(receivedBuffer, expectedBuffer)) {
+    if (
+      receivedBuffer.length !== expectedBuffer.length ||
+      !timingSafeEqual(receivedBuffer, expectedBuffer)
+    ) {
       throw new UnauthorizedException('Invalid webhook signature');
     }
   }

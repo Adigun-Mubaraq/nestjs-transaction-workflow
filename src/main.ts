@@ -14,7 +14,9 @@ async function bootstrap(): Promise<void> {
 
   const config = new DocumentBuilder()
     .setTitle('Idempotent Transaction Workflow API')
-    .setDescription('NestJS sample covering transaction initiation, deterministic state transitions, and signed webhooks.')
+    .setDescription(
+      'NestJS sample covering transaction initiation, deterministic state transitions, and signed webhooks.',
+    )
     .setVersion('1.0')
     .addApiKey({ type: 'apiKey', name: 'Idempotency-Key', in: 'header' }, 'idempotency-key')
     .build();

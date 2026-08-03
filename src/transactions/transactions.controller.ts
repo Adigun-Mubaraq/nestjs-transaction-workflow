@@ -17,12 +17,15 @@ export class TransactionsController {
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Body() input: CreateTransactionDto,
   ): Promise<TransactionResponseDto> {
-    if (!idempotencyKey?.trim()) throw new BadRequestException('Idempotency-Key header is required');
+    if (!idempotencyKey?.trim())
+      throw new BadRequestException('Idempotency-Key header is required');
     return this.transactionsService.initiate(idempotencyKey.trim(), input);
   }
 
   @Post(':id/process')
-  @ApiOperation({ summary: 'Attach a provider reference and move a pending transaction to processing' })
+  @ApiOperation({
+    summary: 'Attach a provider reference and move a pending transaction to processing',
+  })
   markProcessing(
     @Param('id') id: string,
     @Body() input: StartProcessingDto,

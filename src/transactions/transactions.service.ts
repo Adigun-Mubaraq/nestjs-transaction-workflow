@@ -17,7 +17,10 @@ export interface ProviderWebhookResult {
 export class TransactionsService {
   constructor(private readonly transactionsRepository: TransactionsRepository) {}
 
-  async initiate(idempotencyKey: string, input: CreateTransactionDto): Promise<TransactionResponseDto> {
+  async initiate(
+    idempotencyKey: string,
+    input: CreateTransactionDto,
+  ): Promise<TransactionResponseDto> {
     const existing = await this.transactionsRepository.findByIdempotencyKey(idempotencyKey);
     if (existing) return this.toResponse(existing);
 
@@ -56,14 +59,17 @@ export class TransactionsService {
   }
 
   async applyProviderResult(input: ProviderWebhookResult): Promise<TransactionResponseDto> {
-    const transaction = await this.transactionsRepository.findByProviderReference(input.providerReference);
+    const transaction = await this.transactionsRepository.findByProviderReference(
+      input.providerReference,
+    );
     if (!transaction) throw new NotFoundException('Transaction not found for provider reference');
 
     if (transaction.status === input.status) return this.toResponse(transaction);
 
     assertTransitionAllowed(transaction.status, input.status);
     transaction.status = input.status;
-    transaction.failureCode = input.status === TransactionStatus.FAILED ? (input.failureCode ?? 'UNKNOWN') : null;
+    transaction.failureCode =
+      input.status === TransactionStatus.FAILED ? (input.failureCode ?? 'UNKNOWN') : null;
     return this.toResponse(await this.transactionsRepository.save(transaction));
   }
 
@@ -81,6 +87,10 @@ export class TransactionsService {
   }
 
   private isUniqueViolation(error: unknown): boolean {
-    return error instanceof QueryFailedError && (error as QueryFailedError & { driverError?: { code?: string } }).driverError?.code === '23505';
+    return (
+      error instanceof QueryFailedError &&
+      (error as QueryFailedError & { driverError?: { code?: string } }).driverError?.code ===
+        '23505'
+    );
   }
 }

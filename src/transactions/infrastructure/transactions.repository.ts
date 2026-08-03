@@ -22,7 +22,9 @@ export class TransactionsRepository {
     return this.repository.findOne({ where: { providerReference } });
   }
 
-  create(input: Pick<TransactionEntity, 'idempotencyKey' | 'amountMinor' | 'currency' | 'status'>): TransactionEntity {
+  create(
+    input: Pick<TransactionEntity, 'idempotencyKey' | 'amountMinor' | 'currency' | 'status'>,
+  ): TransactionEntity {
     return this.repository.create(input);
   }
 
