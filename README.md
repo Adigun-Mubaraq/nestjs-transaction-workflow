@@ -1,23 +1,25 @@
 # NestJS Transaction Workflow
 
-A compact NestJS code sample designed for technical review. It demonstrates how I structure a reliability-sensitive transaction workflow without using proprietary employer code.
+A compact NestJS implementation of a reliability-sensitive transaction workflow, focused on persisted idempotency, explicit state transitions, replay-safe webhook handling, PostgreSQL persistence, and automated verification.
 
-## What this sample demonstrates
+Built independently and contains no proprietary employer code.
 
-- NestJS modules, controllers, services, dependency injection, and repository boundaries
+## What it demonstrates
+
+- Modular NestJS architecture with controllers, services, dependency injection, and repository boundaries
 - PostgreSQL persistence with TypeORM
-- DTO validation with `class-validator`
-- idempotent transaction initiation using an `Idempotency-Key`
-- deterministic transaction state transitions
-- replay-safe provider webhook handling
-- HMAC signature verification abstraction
-- structured API errors
-- unit tests and one HTTP-level integration test
-- Docker Compose for PostgreSQL
+- DTO validation using `class-validator`
+- Idempotent transaction initiation with a persisted `Idempotency-Key`
+- Explicit, deterministic transaction state transitions
+- Replay-safe provider webhook processing
+- Isolated HMAC signature verification
+- Structured API error handling
+- Unit and HTTP-level integration tests
+- Docker Compose for local PostgreSQL
 - GitHub Actions for lint, test, and build verification
 - Swagger/OpenAPI documentation
 
-## Workflow
+## Transaction workflow
 
 ```text
 POST /transactions
@@ -39,33 +41,45 @@ POST /transactions/:id/process
 SUCCEEDED  FAILED
 ```
 
-Terminal states cannot be reversed. Repeated delivery of the same terminal result is treated idempotently.
+Terminal states cannot be reversed. Repeated delivery of the same terminal result is handled idempotently.
 
-## Architectural choices
+## Engineering decisions
 
-### 1. Idempotency is persisted
+### Persist idempotency at the database boundary
 
-The idempotency key has a database uniqueness constraint. The service first checks for an existing transaction and also handles a concurrent insert race by reading the winner after a PostgreSQL unique-constraint violation.
+The idempotency key is protected by a database uniqueness constraint.
 
-### 2. State transitions are explicit
+The service first checks for an existing transaction and also handles concurrent insert races by reading the winning record after a PostgreSQL unique-constraint violation.
 
-A small domain state machine owns valid transitions. This prevents controllers, webhooks, or future workers from advancing state arbitrarily.
+This keeps idempotency from depending on process memory or request timing.
 
-### 3. Provider results are replay-safe
+### Keep state transitions explicit
 
-A duplicate provider webhook that repeats the current terminal state returns the existing transaction. A conflicting terminal transition is rejected.
+A small domain state machine owns valid transitions.
 
-### 4. Signature verification is isolated
+Controllers, webhooks, and future background workers cannot advance transaction state arbitrarily. Invalid or conflicting terminal transitions are rejected.
 
-The controller delegates HMAC verification to a dedicated service. A real integration could replace this implementation with a provider-specific canonical payload and signature scheme without coupling cryptographic rules to transaction logic.
+### Treat provider delivery as replayable
 
-### 5. Persistence does not leak into controllers
+Provider webhooks may be delivered more than once.
 
-Controllers validate transport concerns. The service coordinates domain behavior. The repository wraps TypeORM access so persistence can be changed or tested independently.
+Repeated delivery of the same terminal result returns the existing transaction, while a conflicting terminal result is rejected. This keeps retries safe without allowing terminal state to drift.
+
+### Isolate provider verification
+
+Webhook signature verification lives behind a dedicated service rather than inside transaction logic.
+
+A production integration can replace the local HMAC implementation with a provider-specific canonical payload and signature scheme without coupling cryptographic rules to the transaction domain.
+
+### Keep persistence behind a repository boundary
+
+Controllers own transport concerns. The service coordinates domain behavior. The repository wraps TypeORM access.
+
+This keeps HTTP, domain, and persistence responsibilities separate and makes the workflow easier to test and evolve.
 
 ## Run locally
 
-Requirements:
+### Requirements
 
 - Node.js 22+
 - Docker
@@ -77,15 +91,15 @@ npm install
 npm run start:dev
 ```
 
-API documentation:
+Swagger/OpenAPI documentation:
 
 ```text
 http://localhost:3000/docs
 ```
 
-## Example requests
+## Example flow
 
-Create a transaction:
+### 1. Create a transaction
 
 ```bash
 curl -X POST http://localhost:3000/api/transactions \
@@ -94,7 +108,7 @@ curl -X POST http://localhost:3000/api/transactions \
   -d '{"amountMinor":250000,"currency":"USD"}'
 ```
 
-Attach a provider reference and start processing:
+### 2. Attach a provider reference and begin processing
 
 ```bash
 curl -X POST http://localhost:3000/api/transactions/<TRANSACTION_ID>/process \
@@ -102,13 +116,13 @@ curl -X POST http://localhost:3000/api/transactions/<TRANSACTION_ID>/process \
   -d '{"providerReference":"provider-tx-123"}'
 ```
 
-Generate a local webhook signature:
+### 3. Generate a local webhook signature
 
 ```bash
 node -e "const c=require('crypto'); const p={providerReference:'provider-tx-123',status:'SUCCEEDED'}; console.log(c.createHmac('sha256','local-webhook-secret').update(JSON.stringify(p)).digest('hex'))"
 ```
 
-Apply the provider result:
+### 4. Apply the provider result
 
 ```bash
 curl -X POST http://localhost:3000/api/webhooks/provider \
@@ -126,24 +140,31 @@ npm run test:e2e
 npm run build
 ```
 
-## Deliberate scope limits
+The repository is configured so the same verification path can run in GitHub Actions.
 
-This is a review-sized sample, not a full payment platform. Production extensions would include:
+## Deliberate scope
+
+This repository is intentionally review-sized. It demonstrates the transaction boundary and reliability decisions without pretending to be a complete payment platform.
+
+A production extension would likely add:
 
 - database migrations instead of development-time `synchronize`
 - transactional outbox for downstream event publication
 - provider request idempotency and timeout recovery
+- immutable webhook receipt storage
 - distributed tracing and structured request correlation
 - authentication and authorization
 - rate limiting
-- immutable webhook receipt storage
-- secrets management through a cloud provider
+- cloud-managed secrets
 - deployment manifests and environment-specific configuration
 
 ## Suggested review path
 
-1. `transactions.service.ts`
-2. `transaction-state-machine.ts`
-3. `transactions.repository.ts`
-4. `webhooks.controller.ts` and `webhook-signature.service.ts`
-5. unit and integration tests
+For a quick technical review:
+
+1. `src/transactions/transactions.service.ts`
+2. `src/transactions/domain/transaction-state-machine.ts`
+3. `src/transactions/infrastructure/transactions.repository.ts`
+4. `src/webhooks/webhooks.controller.ts`
+5. `src/webhooks/webhook-signature.service.ts`
+6. unit and integration tests
